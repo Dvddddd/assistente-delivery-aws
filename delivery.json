@@ -1,0 +1,70 @@
+{
+  "Comment": "Assistente de Delivery com AWS Step Functions e Amazon Bedrock",
+  "StartAt": "ReceberPedido",
+  "States": {
+    "ReceberPedido": {
+      "Type": "Pass",
+      "Next": "ValidarPedido"
+    },
+    "ValidarPedido": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.valor",
+          "NumericGreaterThan": 0,
+          "Next": "VerificarPagamento"
+        }
+      ],
+      "Default": "PedidoInvalido"
+    },
+    "PedidoInvalido": {
+      "Type": "Fail",
+      "Cause": "Pedido invalido"
+    },
+    "VerificarPagamento": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.pagamentoAprovado",
+          "BooleanEquals": true,
+          "Next": "GerarMensagem"
+        }
+      ],
+      "Default": "PagamentoRecusado"
+    },
+    "PagamentoRecusado": {
+      "Type": "Fail",
+      "Cause": "Pagamento nao aprovado"
+    },
+    "GerarMensagem": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::bedrock:invokeModel",
+      "Parameters": {
+        "ModelId": "amazon.nova-lite-v1:0",
+        "Body": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "text.$": "States.Format('Crie uma mensagem curta em portugues para o cliente {}, informando que seu pedido de {} foi confirmado e sera enviado para entrega.', $.cliente, $.pedido)"
+                }
+              ]
+            }
+          ],
+          "inferenceConfig": {
+            "maxTokens": 150
+          }
+        }
+      },
+      "ResultPath": "$.respostaIA",
+      "Next": "AtualizarStatus"
+    },
+    "AtualizarStatus": {
+      "Type": "Pass",
+      "Result": "Saiu para entrega",
+      "ResultPath": "$.status",
+      "End": true
+    }
+  }
+}
